@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Didáctico: El Perceptrón Artificial</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome para Íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#090d16',
+                            card: '#111827',
+                            primary: '#00F2FF',
+                            secondary: '#8B5CF6',
+                            accent: '#10B981',
+                            neutral: '#6B7280',
+                            dark: '#030712'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos a medida para sliders y transiciones fluidas */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00F2FF;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.8);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.35);
+        }
+        .glow-purple {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.35);
+        }
+        /* Animaciones para el flujo de información de la neurona */
+        @keyframes pulse-flow {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+        }
+        .flowing-line {
+            stroke-dasharray: 6, 6;
+            animation: pulse-flow 1.5s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-cyber-bg text-gray-100 min-h-screen font-sans flex flex-col antialiased selection:bg-cyber-primary selection:text-cyber-dark">
+
+    <!-- Encabezado / Navbar -->
+    <header class="border-b border-gray-800 bg-cyber-dark/80 backdrop-blur-md sticky top-0 z-50 transition-all">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-gradient-to-tr from-cyber-primary to-cyber-secondary rounded-xl text-cyber-dark flex items-center justify-center shadow-lg shadow-cyber-primary/20">
+                    <i class="fa-solid fa-brain text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyber-primary bg-clip-text text-transparent">
+                        Laboratorio del Perceptrón
+                    </h1>
+                    <p class="text-xs text-cyber-neutral font-medium">Visualizador Didáctico de Redes Neuronales</p>
+                </div>
+            </div>
+            <!-- Presets Rápidos -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-gray-400 font-semibold mr-1"><i class="fa-solid fa-sliders mr-1"></i> Preajustes clásicos:</span>
+                <button onclick="loadPreset('AND')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 hover:text-cyber-primary transition border border-gray-700/50 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-yellow-400"></span> AND Gate
+                </button>
+                <button onclick="loadPreset('OR')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 hover:text-cyber-primary transition border border-gray-700/50 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> OR Gate
+                </button>
+                <button onclick="loadPreset('XOR')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 hover:text-red-400 transition border border-gray-700/50 flex items-center gap-1.5" title="¡Spoiler: No se puede resolver con un solo perceptrón!">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> XOR (No lineal)
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
+        <!-- Tarjeta de Introducción Pedagógica -->
+        <div class="bg-gradient-to-r from-indigo-950/40 via-cyber-card to-cyber-dark/40 border border-gray-800 rounded-2xl p-5 mb-8 flex flex-col md:flex-row gap-5 items-center justify-between">
+            <div class="space-y-2">
+                <span class="px-2.5 py-1 text-[10px] uppercase tracking-wider font-extrabold bg-cyber-primary/10 text-cyber-primary rounded-full border border-cyber-primary/20">Guía de aprendizaje</span>
+                <h2 class="text-lg font-bold text-gray-100">¿Qué estás experimentando aquí?</h2>
+                <p class="text-sm text-gray-300 leading-relaxed max-w-3xl">
+                    El <strong>Perceptrón</strong> es la neurona artificial básica. Recibe entradas ($x_1, x_2$), las amplifica o reduce usando pesos ($w_1, w_2$), añade un sesgo (*bias*) y pasa el resultado por una función de activación para decidir si dispara una señal. ¡Mueve los controles a la izquierda y observa cómo gira la línea divisoria del plano de decisión a la derecha!
+                </p>
+            </div>
+            <button onclick="toggleHelpModal()" class="w-full md:w-auto px-5 py-2.5 text-sm font-semibold rounded-xl bg-gray-800 hover:bg-gray-700 transition flex items-center justify-center gap-2 border border-gray-700">
+                <i class="fa-regular fa-circle-question"></i> Ver Tutorial Completo
+            </button>
+        </div>
+
+        <!-- Grid de Trabajo -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- COLUMNA 1: CONTROLES DEL ALUMNO (5 Columnas) -->
+            <section class="lg:col-span-5 space-y-6">
+                
+                <!-- Panel de Configuración e Inputs -->
+                <div class="bg-cyber-card border border-gray-800 rounded-2xl p-6 shadow-xl space-y-6">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+                        <h3 class="font-bold text-md text-gray-100 flex items-center gap-2">
+                            <i class="fa-solid fa-gamepad text-cyber-primary"></i> Panel de Control
+                        </h3>
+                        <span class="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded-md font-mono">Simulación en vivo</span>
+                    </div>
+
+                    <!-- Función de Activación -->
+                    <div class="space-y-2">
+                        <label for="activationSelect" class="block text-sm font-semibold text-gray-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-wave-square text-cyber-secondary"></i> Función de Activación $f(z)$
+                        </label>
+                        <select id="activationSelect" onchange="updateSimulation()" class="w-full bg-cyber-dark border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyber-primary focus:border-transparent transition">
+                            <option value="step">Escalón Unitario (Heaviside) — Binario (0 o 1)</option>
+                            <option value="sigmoid">Sigmoide — Probabilística continua (0 a 1)</option>
+                            <option value="relu">ReLU — Rectificadora Lineal (Máx 0 o z)</option>
+                        </select>
+                    </div>
+
+                    <!-- Entradas (Inputs) -->
+                    <div class="space-y-4">
+                        <h4 class="text-xs font-extrabold uppercase tracking-widest text-cyber-neutral"><i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> Señales de Entrada</h4>
+                        
+                        <!-- Input x1 -->
+                        <div class="bg-cyber-dark/60 p-4 rounded-xl border border-gray-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">Entrada $x_1$</span>
+                                <span id="val_x1" class="font-mono text-sm font-bold text-cyber-primary bg-cyber-primary/10 px-2 py-0.5 rounded">0.5</span>
+                            </div>
+                            <input type="range" id="slide_x1" min="-2.0" max="2.0" step="0.1" value="0.5" oninput="updateSimulation()" class="w-full accent-cyber-primary bg-gray-800 h-2 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                                <span>-2.0 (Inactivo/Negativo)</span>
+                                <span>2.0 (Activo/Positivo)</span>
+                            </div>
+                        </div>
+
+                        <!-- Input x2 -->
+                        <div class="bg-cyber-dark/60 p-4 rounded-xl border border-gray-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">Entrada $x_2$</span>
+                                <span id="val_x2" class="font-mono text-sm font-bold text-cyber-primary bg-cyber-primary/10 px-2 py-0.5 rounded">0.5</span>
+                            </div>
+                            <input type="range" id="slide_x2" min="-2.0" max="2.0" step="0.1" value="-0.5" oninput="updateSimulation()" class="w-full accent-cyber-primary bg-gray-800 h-2 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                                <span>-2.0</span>
+                                <span>2.0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pesos Sinápticos (Weights) & Sesgo (Bias) -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-extrabold uppercase tracking-widest text-cyber-neutral"><i class="fa-solid fa-bezier-curve mr-1"></i> Parámetros Sinápticos</h4>
+                        
+                        <!-- Peso w1 -->
+                        <div class="bg-cyber-dark/60 p-4 rounded-xl border border-gray-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">Peso $w_1$ (Asociado a $x_1$)</span>
+                                <span id="val_w1" class="font-mono text-sm font-bold text-cyber-secondary bg-cyber-secondary/10 px-2 py-0.5 rounded">1.0</span>
+                            </div>
+                            <input type="range" id="slide_w1" min="-3.0" max="3.0" step="0.1" value="1.2" oninput="updateSimulation()" class="w-full accent-cyber-secondary bg-gray-800 h-2 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                                <span>Inhibidor (-3.0)</span>
+                                <span>Excitador (+3.0)</span>
+                            </div>
+                        </div>
+
+                        <!-- Peso w2 -->
+                        <div class="bg-cyber-dark/60 p-4 rounded-xl border border-gray-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">Peso $w_2$ (Asociado a $x_2$)</span>
+                                <span id="val_w2" class="font-mono text-sm font-bold text-cyber-secondary bg-cyber-secondary/10 px-2 py-0.5 rounded">1.0</span>
+                            </div>
+                            <input type="range" id="slide_w2" min="-3.0" max="3.0" step="0.1" value="0.8" oninput="updateSimulation()" class="w-full accent-cyber-secondary bg-gray-800 h-2 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                                <span>Inhibidor (-3.0)</span>
+                                <span>Excitador (+3.0)</span>
+                            </div>
+                        </div>
+
+                        <!-- Sesgo / Bias b -->
+                        <div class="bg-cyber-dark/60 p-4 rounded-xl border border-gray-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300 flex items-center gap-1">Umbral / Sesgo ($bias$) <i class="fa-solid fa-circle-info text-xs text-cyber-neutral" title="Ajusta qué tan fácil es para la neurona disparar una salida"></i></span>
+                                <span id="val_b" class="font-mono text-sm font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">-0.3</span>
+                            </div>
+                            <input type="range" id="slide_b" min="-2.0" max="2.0" step="0.1" value="-0.2" oninput="updateSimulation()" class="w-full accent-amber-500 bg-gray-800 h-2 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                                <span>Disparo difícil (-2.0)</span>
+                                <span>Disparo fácil (+2.0)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bloque Matemático en Tiempo Real -->
+                <div class="bg-cyber-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h3 class="font-bold text-md text-gray-100 pb-3 border-b border-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-square-root-variable text-amber-500"></i> Desglose Matemático
+                    </h3>
+                    <div class="space-y-4 font-mono text-sm">
+                        <!-- Ecuación de la suma de entradas -->
+                        <div class="bg-cyber-dark/80 p-3.5 rounded-xl border border-gray-800 space-y-2">
+                            <p class="text-xs text-cyber-neutral font-semibold">1. SUMA PONDERADA (Estímulo Neto):</p>
+                            <p class="text-gray-300 flex flex-wrap gap-1 items-center">
+                                <span>$z = (x_1 \cdot w_1) + (x_2 \cdot w_2) + b$</span>
+                            </p>
+                            <p class="text-cyber-primary text-xs font-bold pt-1 border-t border-gray-800/60">
+                                $z = $ (<span id="calc_x1" class="text-gray-300">0.5</span> $\cdot$ <span id="calc_w1" class="text-gray-300">1.2</span>) + 
+                                (<span id="calc_x2" class="text-gray-300">-0.5</span> $\cdot$ <span id="calc_w2" class="text-gray-300">0.8</span>) + 
+                                (<span id="calc_b" class="text-gray-300">-0.2</span>)
+                            </p>
+                            <p class="text-sm font-bold text-right text-amber-400">
+                                $z = $ <span id="calc_z_res">0.00</span>
+                            </p>
+                        </div>
+
+                        <!-- Ecuación de activación -->
+                        <div class="bg-cyber-dark/80 p-3.5 rounded-xl border border-gray-800 space-y-2">
+                            <p class="text-xs text-cyber-neutral font-semibold">2. FUNCIÓN DE ACTIVACIÓN:</p>
+                            <p class="text-gray-300 text-xs">
+                                <span id="act_formula_text">f(z) = 1 si z ≥ 0 sino 0</span>
+                            </p>
+                            <p class="text-sm font-bold text-right text-cyber-primary pt-1 border-t border-gray-800/60">
+                                Salida $y = f(z) = $ <span id="calc_y_res" class="text-lg text-emerald-400">1</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- COLUMNA 2: VISUALIZADORES E INTERACCIÓN GRÁFICA (7 Columnas) -->
+            <section class="lg:col-span-7 space-y-6">
+                
+                <!-- Diagrama SVG de la Neurona -->
+                <div class="bg-cyber-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-4">
+                        <h3 class="font-bold text-md text-gray-100 flex items-center gap-2">
+                            <i class="fa-solid fa-diagram-project text-cyber-primary"></i> Estructura Interna del Perceptrón
+                        </h3>
+                        <span class="text-xs text-cyber-neutral font-medium">Interactivo</span>
+                    </div>
+
+                    <div class="relative w-full flex justify-center bg-cyber-dark/40 rounded-xl py-4 overflow-x-auto">
+                        <!-- SVG del Perceptrón -->
+                        <svg id="neuronSVG" viewBox="0 0 600 320" width="100%" class="max-w-[550px] min-w-[400px]">
+                            <!-- Líneas de conexiones (Background) -->
+                            <!-- Entrada 1 a Sumatorio -->
+                            <path d="M 80,70 L 250,160" id="line_w1_back" stroke="#1f2937" stroke-width="6" stroke-linecap="round"></path>
+                            <path d="M 80,70 L 250,160" id="line_w1" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" class="flowing-line transition-all duration-300" stroke-dashoffset="0"></path>
+
+                            <!-- Entrada 2 a Sumatorio -->
+                            <path d="M 80,250 L 250,160" id="line_w2_back" stroke="#1f2937" stroke-width="6" stroke-linecap="round"></path>
+                            <path d="M 80,250 L 250,160" id="line_w2" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" class="flowing-line transition-all duration-300" stroke-dashoffset="0"></path>
+
+                            <!-- Bias a Sumatorio -->
+                            <path d="M 250,50 L 250,120" id="line_b_back" stroke="#1f2937" stroke-width="3" stroke-linecap="round"></path>
+                            <path d="M 250,50 L 250,120" id="line_b" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" class="flowing-line transition-all duration-300" stroke-dashoffset="0"></path>
+
+                            <!-- Sumatorio a Activación -->
+                            <path d="M 290,160 L 390,160" id="line_z_back" stroke="#1f2937" stroke-width="6" stroke-linecap="round"></path>
+                            <path d="M 290,160 L 390,160" id="line_z" stroke="#00F2FF" stroke-width="4" stroke-linecap="round" class="flowing-line transition-all duration-300" stroke-dashoffset="0"></path>
+
+                            <!-- Activación a Salida -->
+                            <path d="M 430,160 L 520,160" id="line_y_back" stroke="#1f2937" stroke-width="6" stroke-linecap="round"></path>
+                            <path d="M 430,160 L 520,160" id="line_y" stroke="#10B981" stroke-width="4" stroke-linecap="round" class="flowing-line transition-all duration-300" stroke-dashoffset="0"></path>
+
+                            <!-- Nodos de Entrada -->
+                            <!-- Nodo x1 -->
+                            <circle cx="80" cy="70" r="28" fill="#111827" stroke="#00F2FF" stroke-width="3" class="transition-all"></circle>
+                            <text x="80" y="65" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">Entrada</text>
+                            <text x="80" y="80" id="svg_txt_x1" text-anchor="middle" fill="#00F2FF" font-family="monospace" font-size="14" font-weight="bold">x1: 0.5</text>
+
+                            <!-- Nodo x2 -->
+                            <circle cx="80" cy="250" r="28" fill="#111827" stroke="#00F2FF" stroke-width="3" class="transition-all"></circle>
+                            <text x="80" y="245" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">Entrada</text>
+                            <text x="80" y="260" id="svg_txt_x2" text-anchor="middle" fill="#00F2FF" font-family="monospace" font-size="14" font-weight="bold">x2: -0.5</text>
+
+                            <!-- Nodo Bias (Arriba) -->
+                            <circle cx="250" cy="40" r="18" fill="#111827" stroke="#f59e0b" stroke-width="2"></circle>
+                            <text x="250" y="36" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="bold">Bias</text>
+                            <text x="250" y="47" id="svg_txt_b" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="10" font-weight="bold">b: -0.2</text>
+
+                            <!-- Nodo Sumador (Soma) -->
+                            <circle cx="250" cy="160" r="34" id="svg_node_sum" fill="#111827" stroke="#8B5CF6" stroke-width="3" class="transition-all duration-300"></circle>
+                            <text x="250" y="155" text-anchor="middle" fill="#cbd5e1" font-size="16" font-weight="bold">∑</text>
+                            <text x="250" y="172" id="svg_txt_z" text-anchor="middle" fill="#8B5CF6" font-family="monospace" font-size="12" font-weight="bold">z: 0.0</text>
+
+                            <!-- Nodo Función de Activación -->
+                            <rect x="375" y="130" width="50" height="60" rx="10" id="svg_node_act" fill="#111827" stroke="#00F2FF" stroke-width="3" class="transition-all duration-300"></rect>
+                            <path d="M 385,175 L 395,175 L 395,145 L 415,145" id="svg_act_icon" stroke="#00F2FF" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <text x="400" y="183" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="bold">f(z)</text>
+
+                            <!-- Nodo de Salida -->
+                            <circle cx="520" cy="160" r="28" id="svg_node_out" fill="#111827" stroke="#10B981" stroke-width="3" class="transition-all duration-300"></circle>
+                            <text x="520" y="152" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="bold">Salida</text>
+                            <text x="520" y="170" id="svg_txt_y" text-anchor="middle" fill="#10B981" font-family="monospace" font-size="16" font-weight="bold">y: 1</text>
+                            
+                            <!-- Etiquetas de Pesos sobre las líneas -->
+                            <rect x="150" y="100" width="45" height="18" rx="4" fill="#030712" stroke="#4b5563" stroke-width="1"></rect>
+                            <text x="172" y="113" id="svg_weight_1" text-anchor="middle" fill="#a78bfa" font-family="monospace" font-size="10" font-weight="bold">w1:1.2</text>
+
+                            <rect x="150" y="195" width="45" height="18" rx="4" fill="#030712" stroke="#4b5563" stroke-width="1"></rect>
+                            <text x="172" y="208" id="svg_weight_2" text-anchor="middle" fill="#a78bfa" font-family="monospace" font-size="10" font-weight="bold">w2:0.8</text>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Plano de Clasificación Bidimensional -->
+                <div class="bg-cyber-card border border-gray-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+                        <div class="space-y-1">
+                            <h3 class="font-bold text-md text-gray-100 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-cyber-primary"></i> Plano de Decisión de dos variables (x₁ vs x₂)
+                            </h3>
+                            <p class="text-xs text-cyber-neutral">Arrastra el punto amarillo en el mapa para cambiar los valores de entrada al instante</p>
+                        </div>
+                        <span class="text-xs bg-cyber-primary/10 text-cyber-primary px-2.5 py-1 rounded-md font-mono font-bold">Espacio de Entrada</span>
+                    </div>
+
+                    <!-- Canvas y su Leyenda -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                        <div class="md:col-span-7 flex justify-center">
+                            <!-- Contenedor del Canvas con borde de diseño -->
+                            <div class="relative bg-cyber-dark p-2 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                                <canvas id="decisionCanvas" width="300" height="300" class="rounded-xl cursor-crosshair max-w-full"></canvas>
+                                <!-- Etiquetas de ejes en absoluto -->
+                                <div class="absolute bottom-[-14px] left-1/2 transform -translate-x-1/2 text-[10px] font-bold text-gray-400 bg-cyber-bg px-2">Eje Entrada x₁</div>
+                                <div class="absolute left-[-22px] top-1/2 transform -translate-y-1/2 rotate-270 text-[10px] font-bold text-gray-400 bg-cyber-bg px-2" style="writing-mode: vertical-rl; transform: rotate(180deg);">Eje Entrada x₂</div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de interpretación para el Alumno -->
+                        <div class="md:col-span-5 space-y-4">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-cyber-neutral">Clave de Interpretación:</h4>
+                            
+                            <!-- Indicador de área activa -->
+                            <div class="flex items-center gap-3 bg-cyber-dark/40 p-2.5 rounded-xl border border-emerald-950/40">
+                                <span class="w-4 h-4 rounded bg-emerald-500/20 border border-emerald-400/50 block"></span>
+                                <div class="text-xs text-gray-300">
+                                    <p class="font-bold text-emerald-400">Área Verde (Activa):</p>
+                                    <p class="text-gray-400">La combinación de entradas da una salida de $y > 0$ (Activada).</p>
+                                </div>
+                            </div>
+
+                            <!-- Indicador de área inactiva -->
+                            <div class="flex items-center gap-3 bg-cyber-dark/40 p-2.5 rounded-xl border border-gray-850">
+                                <span class="w-4 h-4 rounded bg-gray-900 border border-gray-700 block"></span>
+                                <div class="text-xs text-gray-300">
+                                    <p class="font-bold text-gray-400">Área Oscura (Inactiva):</p>
+                                    <p class="text-gray-500">La salida de la neurona es $y = 0$ (Apagada).</p>
+                                </div>
+                            </div>
+
+                            <!-- Línea de decisión -->
+                            <div class="flex items-center gap-3 bg-cyber-dark/40 p-2.5 rounded-xl border border-purple-950/40">
+                                <span class="w-6 h-0.5 bg-gradient-to-r from-cyber-secondary to-cyber-primary block"></span>
+                                <div class="text-xs text-gray-300">
+                                    <p class="font-bold text-cyber-primary">Frontera de Decisión:</p>
+                                    <p class="text-gray-400">La línea exacta donde la suma es igual a cero ($z = 0$).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal de Tutorial/Ayuda Educativa -->
+    <div id="helpModal" class="fixed inset-0 z-50 hidden bg-cyber-dark/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-cyber-card border border-gray-800 rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 space-y-6 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+                <h3 class="text-xl font-bold text-cyber-primary flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap"></i> Guía del Alumno: El Perceptrón Simple
+                </h3>
+                <button onclick="toggleHelpModal()" class="text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-sm text-gray-300 leading-relaxed">
+                <p>
+                    Bienvenido al simulador interactivo de la neurona artificial. Las redes neuronales profundas (como GPT o las redes de visión) están compuestas por miles de millones de estas unidades matemáticas sencillas conectadas entre sí.
+                </p>
+
+                <h4 class="font-bold text-gray-100 flex items-center gap-1.5 pt-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyber-primary"></span> 1. Entendiendo las Variables
+                </h4>
+                <ul class="list-disc pl-5 space-y-2 text-gray-400">
+                    <li><strong>Entradas ($x_1, x_2$):</strong> Representan los datos que capta la neurona (p. ej., brillo de un píxel, temperatura de un sensor).</li>
+                    <li><strong>Pesos ($w_1, w_2$):</strong> Es el "canal" por donde viaja la información. Un peso alto y positivo multiplica el estímulo; un peso negativo lo bloquea (inhibidor). Estos son los parámetros que la IA "aprende" automáticamente durante el entrenamiento.</li>
+                    <li><strong>Sesgo/Bias ($b$):</strong> Un valor constante que desplaza la línea de clasificación. Permite a la neurona disparar incluso si todas las entradas son cero.</li>
+                </ul>
+
+                <h4 class="font-bold text-gray-100 flex items-center gap-1.5 pt-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyber-primary"></span> 2. El Teorema de Clasificación Lineal
+                </h4>
+                <p>
+                    El plano de decisión demuestra que un perceptrón es un <strong>clasificador lineal</strong>. Dibuja una línea perfecta en el espacio. Todo lo que cae a un lado de la línea es clasificado como clase positiva, y lo que cae al otro como negativa.
+                </p>
+
+                <h4 class="font-bold text-gray-100 flex items-center gap-1.5 pt-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> 3. El Desafío del XOR
+                    <span class="ml-2 px-1.5 py-0.5 text-[9px] uppercase bg-red-500/10 text-red-400 border border-red-500/20 rounded font-bold">Muy Importante</span>
+                </h4>
+                <p class="bg-red-950/20 p-3 rounded-xl border border-red-900/30 text-gray-300">
+                    Presiona el botón de preajuste <strong>XOR</strong> en la cabecera. Verás que es imposible separar las salidas usando solo una línea recta. Este fue un descubrimiento histórico crucial: ¡una sola neurona artificial no puede resolver problemas lógicos no lineales como el XOR! Para solucionarlo, necesitamos acoplar múltiples neuronas en capas (Redes Multicapa).
+                </p>
+            </div>
+
+            <div class="pt-4 border-t border-gray-800 flex justify-end">
+                <button onclick="toggleHelpModal()" class="px-6 py-2.5 bg-gradient-to-tr from-cyber-primary to-cyber-secondary text-cyber-dark font-bold rounded-xl hover:opacity-90 transition">
+                    ¡Entendido, a Experimentar!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie de página -->
+    <footer class="border-t border-gray-800 bg-cyber-dark/50 py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-2 text-xs text-cyber-neutral">
+            <p>Simulador Educativo desarrollado bajo código abierto para uso didáctico universitario.</p>
+            <p>&copy; 2026 Laboratorio de Ciencias de la Computación. Sin dependencias de red necesarias.</p>
+        </div>
+    </footer>
+
+    <!-- LÓGICA DE SIMULACIÓN EN JAVASCRIPT -->
+    <script>
+        // Referencias a elementos del DOM
+        const slide_x1 = document.getElementById('slide_x1');
+        const slide_x2 = document.getElementById('slide_x2');
+        const slide_w1 = document.getElementById('slide_w1');
+        const slide_w2 = document.getElementById('slide_w2');
+        const slide_b = document.getElementById('slide_b');
+        const activationSelect = document.getElementById('activationSelect');
+
+        // Textos de Valores
+        const val_x1 = document.getElementById('val_x1');
+        const val_x2 = document.getElementById('val_x2');
+        const val_w1 = document.getElementById('val_w1');
+        const val_w2 = document.getElementById('val_w2');
+        const val_b = document.getElementById('val_b');
+
+        // Bloque matemático
+        const calc_x1 = document.getElementById('calc_x1');
+        const calc_x2 = document.getElementById('calc_x2');
+        const calc_w1 = document.getElementById('calc_w1');
+        const calc_w2 = document.getElementById('calc_w2');
+        const calc_b = document.getElementById('calc_b');
+        const calc_z_res = document.getElementById('calc_z_res');
+        const calc_y_res = document.getElementById('calc_y_res');
+        const act_formula_text = document.getElementById('act_formula_text');
+
+        // SVG Elementos
+        const svg_txt_x1 = document.getElementById('svg_txt_x1');
+        const svg_txt_x2 = document.getElementById('svg_txt_x2');
+        const svg_txt_b = document.getElementById('svg_txt_b');
+        const svg_txt_z = document.getElementById('svg_txt_z');
+        const svg_txt_y = document.getElementById('svg_txt_y');
+        const svg_weight_1 = document.getElementById('svg_weight_1');
+        const svg_weight_2 = document.getElementById('svg_weight_2');
+        const svg_node_sum = document.getElementById('svg_node_sum');
+        const svg_node_act = document.getElementById('svg_node_act');
+        const svg_node_out = document.getElementById('svg_node_out');
+        const svg_act_icon = document.getElementById('svg_act_icon');
+
+        const line_w1 = document.getElementById('line_w1');
+        const line_w2 = document.getElementById('line_w2');
+        const line_b = document.getElementById('line_b');
+        const line_z = document.getElementById('line_z');
+        const line_y = document.getElementById('line_y');
+
+        // Canvas de plano
+        const canvas = document.getElementById('decisionCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDraggingInput = false;
+
+        // Fórmulas matemáticas de activación
+        const activationFunctions = {
+            step: {
+                compute: (z) => z >= 0 ? 1 : 0,
+                desc: 'f(z) = 1  si  z ≥ 0  sino  0',
+                svgPath: 'M 385,175 L 395,175 L 395,145 L 415,145' // Escalón unitario
+            },
+            sigmoid: {
+                compute: (z) => 1 / (1 + Math.exp(-z)),
+                desc: 'f(z) = 1 / (1 + e⁻ᶻ)  ∈ [0, 1]',
+                svgPath: 'M 385,175 C 395,175 395,145 400,160 C 405,175 405,145 415,145' // Curva S
+            },
+            relu: {
+                compute: (z) => Math.max(0, z),
+                desc: 'f(z) = máx(0, z)',
+                svgPath: 'M 385,175 L 400,175 L 415,145' // Rectificación lineal
+            }
+        };
+
+        // Escenarios precargados
+        const presets = {
+            AND: { w1: 1.5, w2: 1.5, b: -2.0, act: 'step' },
+            OR:  { w1: 1.5, w2: 1.5, b: -1.0, act: 'step' },
+            XOR: { w1: -1.0, w2: 1.0, b: -0.5, act: 'step' } // Problema clásico no lineal
+        };
+
+        // Cargar escenario predefinido
+        function loadPreset(key) {
+            const data = presets[key];
+            if (!data) return;
+            
+            slide_w1.value = data.w1;
+            slide_w2.value = data.w2;
+            slide_b.value = data.b;
+            activationSelect.value = data.act;
+
+            // Para que se entienda mejor el AND y OR, ponemos las entradas en estados lógicos óptimos
+            if (key === 'AND' || key === 'OR') {
+                slide_x1.value = 1.0;
+                slide_x2.value = 1.0;
+            } else if (key === 'XOR') {
+                slide_x1.value = 1.0;
+                slide_x2.value = 0.0;
+            }
+
+            updateSimulation();
+        }
+
+        // Ejecutar simulación completa y renderizar todo
+        function updateSimulation() {
+            // Leer valores de los sliders
+            const x1 = parseFloat(slide_x1.value);
+            const x2 = parseFloat(slide_x2.value);
+            const w1 = parseFloat(slide_w1.value);
+            const w2 = parseFloat(slide_w2.value);
+            const b = parseFloat(slide_b.value);
+            const actType = activationSelect.value;
+
+            // Actualizar textos de UI
+            val_x1.textContent = x1.toFixed(1);
+            val_x2.textContent = x2.toFixed(1);
+            val_w1.textContent = w1.toFixed(1);
+            val_w2.textContent = w2.toFixed(1);
+            val_b.textContent = b.toFixed(1);
+
+            // 1. Calcular Suma Ponderada (z)
+            const z = (x1 * w1) + (x2 * w2) + b;
+
+            // 2. Aplicar función de activación para obtener Salida (y)
+            const actFunc = activationFunctions[actType];
+            const y = actFunc.compute(z);
+
+            // Actualizar Desglose Matemático
+            calc_x1.textContent = x1.toFixed(1);
+            calc_x2.textContent = x2.toFixed(1);
+            calc_w1.textContent = w1.toFixed(1);
+            calc_w2.textContent = w2.toFixed(1);
+            calc_b.textContent = b.toFixed(1);
+            calc_z_res.textContent = z.toFixed(3);
+            calc_y_res.textContent = y.toFixed(3);
+            act_formula_text.textContent = actFunc.desc;
+
+            // Actualizar Gráficos del Diagrama SVG
+            svg_txt_x1.textContent = `x1: ${x1.toFixed(1)}`;
+            svg_txt_x2.textContent = `x2: ${x2.toFixed(1)}`;
+            svg_txt_b.textContent = `b: ${b.toFixed(1)}`;
+            svg_txt_z.textContent = `z: ${z.toFixed(2)}`;
+            svg_txt_y.textContent = `y: ${y.toFixed(2)}`;
+            svg_weight_1.textContent = `w1:${w1.toFixed(1)}`;
+            svg_weight_2.textContent = `w2:${w2.toFixed(1)}`;
+
+            // Modificar ícono de activación en el SVG según el tipo seleccionado
+            svg_act_icon.setAttribute('d', actFunc.svgPath);
+
+            // Dinamismo de líneas (espesor según peso, color según signo)
+            adjustLineStyle(line_w1, w1);
+            adjustLineStyle(line_w2, w2);
+            adjustLineStyle(line_b, b);
+            
+            // Intensidad de energía al sumador y salida
+            adjustTransferLine(line_z, z);
+            adjustTransferLine(line_y, y);
+
+            // Brillo de nodos cuando hay activación fuerte
+            updateNodeGlow(svg_node_sum, z);
+            updateNodeGlow(svg_node_out, y);
+
+            // 3. Dibujar el plano de decisión en el Canvas
+            drawDecisionPlane(w1, w2, b, x1, x2, actFunc.compute);
+        }
+
+        // Dar formato visual a las conexiones sinápticas según el peso
+        function adjustLineStyle(lineElement, weight) {
+            const absWeight = Math.abs(weight);
+            // El grosor de la línea representa el valor absoluto del peso
+            const strokeWidth = Math.max(1, absWeight * 3);
+            lineElement.setAttribute('stroke-width', strokeWidth);
+            
+            // Excitador (+) o Inhibidor (-) representado por color
+            if (weight > 0) {
+                lineElement.setAttribute('stroke', '#10B981'); // Verde para excitante
+            } else if (weight < 0) {
+                lineElement.setAttribute('stroke', '#EF4444'); // Rojo para inhibitorio
+            } else {
+                lineElement.setAttribute('stroke', '#4B5563'); // Gris neutro si es cero
+            }
+
+            // Aceleración del flujo dinámico basado en la fuerza del peso
+            const speed = absWeight > 0 ? (3 / absWeight) : 0;
+            if (speed > 0) {
+                lineElement.style.animationDuration = `${Math.min(5, Math.max(0.4, speed))}s`;
+                lineElement.style.display = 'block';
+            } else {
+                lineElement.style.display = 'none';
+            }
+        }
+
+        // Estilo de línea de salida (z y output)
+        function adjustTransferLine(lineElement, value) {
+            const opacity = Math.min(1.0, Math.max(0.1, Math.abs(value)));
+            lineElement.setAttribute('stroke-opacity', opacity);
+            lineElement.setAttribute('stroke-width', Math.max(2, Math.abs(value) * 4));
+        }
+
+        // Cambiar el color de los nodos y sus bordes dinámicamente
+        function updateNodeGlow(node, val) {
+            if (val > 0) {
+                node.setAttribute('fill', '#111827');
+                node.setAttribute('stroke-width', '4');
+                // Si está sumamente activo, aumenta el diámetro ligeramente
+                node.setAttribute('r', node.id === 'svg_node_sum' ? '36' : '30');
+            } else {
+                node.setAttribute('fill', '#0B0F19');
+                node.setAttribute('stroke-width', '2.5');
+                node.setAttribute('r', node.id === 'svg_node_sum' ? '34' : '28');
+            }
+        }
+
+        // Renderizado del plano de clasificación
+        function drawDecisionPlane(w1, w2, b, inputX1, inputX2, activationFunc) {
+            const width = canvas.width;
+            const height = canvas.height;
+            const imgData = ctx.createImageData(width, height);
+            
+            // Recorrer pixel por pixel el plano [-2, 2]
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    // Mapear coordenadas de pixeles de pantalla al plano cartesiano real [-2.2, 2.2] para dar aire
+                    const xReal = ((x / width) * 4.4) - 2.2;
+                    const yReal = 2.2 - ((y / height) * 4.4); // Invertir eje Y
+
+                    // Calcular salida para este punto exacto del mapa
+                    const z = (xReal * w1) + (yReal * w2) + b;
+                    const output = activationFunc(z);
+
+                    // Colorear según la salida
+                    const pixelIndex = (y * width + x) * 4;
+                    if (output > 0) {
+                        // Área Activa: Matiz verde/cian fluorescente translúcido
+                        imgData.data[pixelIndex] = 16;       // R
+                        imgData.data[pixelIndex + 1] = 185; // G
+                        imgData.data[pixelIndex + 2] = 129; // B
+                        // Escalar opacidad si la función es continua (sigmoide / relu)
+                        imgData.data[pixelIndex + 3] = Math.round(Math.min(1.0, output) * 45); // Alpha
+                    } else {
+                        // Área Inactiva: Tono oscuro neutral de fondo
+                        imgData.data[pixelIndex] = 15;
+                        imgData.data[pixelIndex + 1] = 23;
+                        imgData.data[pixelIndex + 2] = 42;
+                        imgData.data[pixelIndex + 3] = 150;
+                    }
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            // Dibujar rejilla / ejes de referencia
+            ctx.strokeStyle = 'rgba(75, 85, 99, 0.2)';
+            ctx.lineWidth = 1;
+            
+            // Eje central vertical (x1 = 0)
+            ctx.beginPath();
+            ctx.moveTo(width / 2, 0);
+            ctx.lineTo(width / 2, height);
+            ctx.stroke();
+
+            // Eje central horizontal (x2 = 0)
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+
+            // Dibujar línea de separación lineal exacta (Donde w1*x1 + w2*x2 + b = 0)
+            // Despejando: x2 = -(w1 * x1 + b) / w2
+            ctx.strokeStyle = '#8B5CF6';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            
+            // Buscamos los puntos en los bordes del plano cartesiano (-2.2 y +2.2)
+            const xPoints = [-2.2, 2.2];
+            const yPoints = [];
+
+            if (Math.abs(w2) > 0.0001) {
+                xPoints.forEach(x => {
+                    const yVal = -(w1 * x + b) / w2;
+                    yPoints.push(yVal);
+                });
+
+                // Convertir de coordenadas cartesianas reales a pixeles de pantalla
+                const pt1_x = ((xPoints[0] + 2.2) / 4.4) * width;
+                const pt1_y = (2.2 - yPoints[0]) / 4.4 * height;
+                const pt2_x = ((xPoints[1] + 2.2) / 4.4) * width;
+                const pt2_y = (2.2 - yPoints[1]) / 4.4 * height;
+
+                ctx.moveTo(pt1_x, pt1_y);
+                ctx.lineTo(pt2_x, pt2_y);
+                ctx.stroke();
+            } else if (Math.abs(w1) > 0.0001) {
+                // Caso vertical puro si w2 es cero (evitar división por cero)
+                const xVal = -b / w1;
+                const screenX = ((xVal + 2.2) / 4.4) * width;
+                ctx.moveTo(screenX, 0);
+                ctx.lineTo(screenX, height);
+                ctx.stroke();
+            }
+
+            // Dibujar el punto de entrada seleccionado actualmente por el alumno
+            const currentScreenX = ((inputX1 + 2.2) / 4.4) * width;
+            const currentScreenY = (2.2 - inputX2) / 4.4 * height;
+
+            // Halo luminoso para la entrada
+            ctx.beginPath();
+            ctx.arc(currentScreenX, currentScreenY, 9, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.4)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(currentScreenX, currentScreenY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00F2FF'; // Punto cian central
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1.5;
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // Interactividad táctil y del mouse para el Canvas (Arrastrar y configurar entradas)
+        function handleCanvasInteraction(event) {
+            const rect = canvas.getBoundingClientRect();
+            // Soporta coordenadas táctiles (touch) y de mouse tradicional
+            const clientX = event.clientX || (event.touches && event.touches[0].clientX);
+            const clientY = event.clientY || (event.touches && event.touches[0].clientY);
+            
+            if (!clientX || !clientY) return;
+
+            const relativeX = clientX - rect.left;
+            const relativeY = clientY - rect.top;
+
+            // Calcular equivalencia en plano cartesiano real [-2.0, 2.0]
+            let calcX = ((relativeX / canvas.width) * 4.4) - 2.2;
+            let calcY = 2.2 - ((relativeY / canvas.height) * 4.4);
+
+            // Limitar rango para evitar salirse de los límites de los sliders
+            calcX = Math.min(2.0, Math.max(-2.0, calcX));
+            calcY = Math.min(2.0, Math.max(-2.0, calcY));
+
+            // Actualizar sliders e iniciar recálculo
+            slide_x1.value = calcX.toFixed(1);
+            slide_x2.value = calcY.toFixed(1);
+
+            updateSimulation();
+        }
+
+        // Eventos para arrastre fluido en el plano
+        canvas.addEventListener('mousedown', (e) => {
+            isDraggingInput = true;
+            handleCanvasInteraction(e);
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDraggingInput = false;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDraggingInput) {
+                handleCanvasInteraction(e);
+            }
+        });
+
+        // Soporte móvil táctil
+        canvas.addEventListener('touchstart', (e) => {
+            isDraggingInput = true;
+            handleCanvasInteraction(e);
+            e.preventDefault(); // Evita scroll de pantalla al manipular la simulación
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (isDraggingInput) {
+                handleCanvasInteraction(e);
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => {
+            isDraggingInput = false;
+        });
+
+        // Control del Modal informativo
+        function toggleHelpModal() {
+            const modal = document.getElementById('helpModal');
+            modal.classList.toggle('hidden');
+        }
+
+        // Ejecución inicial al montar el DOM
+        window.onload = function() {
+            updateSimulation();
+        };
+    </script>
+</body>
+</html>
